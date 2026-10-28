@@ -6,6 +6,7 @@ The user should be able to toggle between shapes by pressing any of the shape bu
 
 If multiplayer is chosen, an option to either join server or create server will appear as buttons. If the create server is selected, the user will see a code popup and a waiting for friend text line to appear. The other user on their own computer will select the join server and then be prompted to enter a code. They will enter the code on the first person’s computer and be connected to the server. Instead of clients, multiplayer will just consist of the mosaic creations type and a random image prompt. There will be a customizable time limit of 30 seconds, 1 minute, 2 minutes, 5 minutes, or 10 minutes. Both players create the mosaic and hit finish before the timer runs out. The worldview will shift to display both mosaics side by side and the players vote on which turned out best. The users can play multiple rounds once voting is over by clicking the next round button or exit by clicking return home button. 
 
+claude's updates below:
 ## Running the game (single player)
 
 1. Open Terminal and go to this folder:
@@ -26,3 +27,7 @@ If multiplayer is chosen, an option to either join server or create server will 
 ### Status
 - Scoring is a **placeholder**: `placeholder_score()` in `mosaic_master.py` rewards canvas coverage, color variety and tile count. It doesn't check whether the picture matches the request yet; the plan is to replace it with an image-similarity API call that returns `(score, comment)`.
 - Multiplayer is not built yet.
+--------
+tweaks to make:
+1. no way to scale tiles, this could be useful.
+2. no way to duplicate tiles
