@@ -31,3 +31,4 @@ claude's updates below:
 tweaks to make:
 1. no way to scale tiles, this could be useful.
 2. no way to duplicate tiles
+3. need to integrate a low/no cost way to do scoring so it actually depends on how close the user's composition is and not just how full the canvas is. 
