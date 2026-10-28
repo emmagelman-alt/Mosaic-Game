@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mosaic Master</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&display=swap">
+<style>
+  /* Plays mosaic_master.py in the browser: Pyodide (Python compiled to
+     WebAssembly) runs the same file the desktop version runs. */
+  :root {
+    --bg: #1d1724;
+    --panel: #2a2133;
+    --ink: #f4ecd8;
+    --muted: #b9aec4;
+    --wood: #96623a;
+    --display: "Pixelify Sans", "Courier New", monospace;
+    --body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 20px;
+    box-sizing: border-box;
+  }
+  [hidden] { display: none !important; }
+  .wrap { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 {
+    font-family: var(--display); font-weight: 700; font-size: clamp(26px, 5vw, 40px);
+    margin: 0; letter-spacing: 0.04em;
+  }
+  h1 span:nth-child(7n+1) { color: #f05050; } h1 span:nth-child(7n+2) { color: #faaa32; }
+  h1 span:nth-child(7n+3) { color: #fadc46; } h1 span:nth-child(7n+4) { color: #6ec85a; }
+  h1 span:nth-child(7n+5) { color: #50aaf0; } h1 span:nth-child(7n+6) { color: #aa6ee6; }
+  h1 span:nth-child(7n+7) { color: #f078b4; }
+  .tag { font-family: var(--display); color: var(--muted); font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .cabinet {
+    position: relative; border: 6px solid var(--wood); border-radius: 6px;
+    box-shadow: 0 6px 0 #00000066; background: #000; max-width: 100%;
+  }
+  canvas {
+    display: block; width: 100%; aspect-ratio: 16 / 9; height: auto;
+    image-rendering: pixelated; image-rendering: crisp-edges; outline: none;
+  }
+  .loader {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 10px; background: var(--panel); text-align: center; padding: 16px;
+    font-family: var(--display); font-size: clamp(16px, 2.6vw, 22px);
+  }
+  .loader small { font-family: var(--body); color: var(--muted); font-size: 13px; }
+  .tiles { display: flex; gap: 6px; }
+  .tiles i { width: 14px; height: 14px; display: block; animation: hop 0.9s infinite steps(2); }
+  .tiles i:nth-child(1) { background: #f05050; } .tiles i:nth-child(2) { background: #fadc46; animation-delay: .15s; }
+  .tiles i:nth-child(3) { background: #6ec85a; animation-delay: .3s; } .tiles i:nth-child(4) { background: #50aaf0; animation-delay: .45s; }
+  @keyframes hop { 50% { transform: translateY(-6px); } }
+  @media (prefers-reduced-motion: reduce) { .tiles i { animation: none; } }
+  .help {
+    background: var(--panel); border-radius: 6px; padding: 12px 16px; display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 6px 20px; font-size: 14px; color: var(--muted);
+  }
+  .help b { color: var(--ink); font-weight: 600; }
+  .note { font-size: 13px; color: var(--muted); margin: 0; }
+  .error { color: #ff9a8a; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 aria-label="Mosaic Master"><span>M</span><span>o</span><span>s</span><span>a</span><span>i</span><span>c</span> <span>M</span><span>a</span><span>s</span><span>t</span><span>e</span><span>r</span></h1>
+    <div class="tag">Single player &middot; pixel tile shop</div>
+  </header>
+
+  <div class="cabinet">
+    <canvas id="canvas" width="640" height="360" tabindex="0" aria-label="Mosaic Master game"></canvas>
+    <div class="loader" id="loader">
+      <div class="tiles" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div id="status">Opening the shop&hellip;</div>
+      <small id="detail">Loading Python in your browser (about 18 MB the first time).</small>
+    </div>
+  </div>
+
+  <div class="help">
+    <div><b>Drag</b> tiles from the pile onto the canvas</div>
+    <div><b>Double-click</b> a placed tile to let it overlap</div>
+    <div><b>R</b> rotates the tile under the mouse</div>
+    <div><b>Drag off</b> the canvas to remove a tile</div>
+  </div>
+  <p class="note">Scores are a placeholder for now: they reward covering the canvas with plenty of tiles and colors, not how much your mosaic looks like the request.</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js"></script>
+<script>
+const BOOT = `
+import asyncio, time, pygame
+import mosaic_master as mm
+
+pygame.init()
+screen = pygame.display.set_mode((mm.W, mm.H))
+game = mm.Game(screen)
+
+from js import gameReady
+gameReady()
+
+async def main():
+    last = time.time()
+    while True:
+        try:
+            now = time.time()
+            dt, last = min(0.05, now - last), now
+            for event in pygame.event.get():
+                game.handle_event(event)
+            game.update(dt)
+            game.draw()
+            pygame.display.flip()
+        except Exception:
+            import traceback
+            traceback.print_exc()
+        await asyncio.sleep(1 / 60)
+
+asyncio.ensure_future(main())
+`;
+
+const status = document.getElementById("status");
+const detail = document.getElementById("detail");
+const canvas = document.getElementById("canvas");
+
+// Python calls this once the game exists; the game loop keeps running
+// after that, so we can't wait for the script to end.
+window.gameReady = () => {
+  document.getElementById("loader").hidden = true;
+  canvas.focus({ preventScroll: true });
+};
+
+function showError(err) {
+  status.textContent = "The game couldn't start in this browser.";
+  status.classList.add("error");
+  detail.textContent = String(err && err.message || err).slice(-300);
+  console.error(err);
+}
+
+async function start() {
+  try {
+    const pyodide = await loadPyodide();
+    status.textContent = "Unpacking the tiles…";
+    pyodide.canvas.setCanvas2D(canvas);
+    await pyodide.loadPackage("pygame-ce");
+    // mosaic_master.py sits next to this page in the repo, so the web
+    // version always plays whatever is on main.
+    const source = await (await fetch("mosaic_master.py", { cache: "no-cache" })).text();
+    pyodide.FS.writeFile("mosaic_master.py", source);
+    status.textContent = "Opening the doors…";
+    pyodide.runPythonAsync(BOOT).catch(showError);
+  } catch (err) {
+    showError(err);
+  }
+}
+canvas.addEventListener("pointerdown", () => canvas.focus({ preventScroll: true }));
+start();
+</script>
+</body>
+</html>
